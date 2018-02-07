@@ -7,19 +7,142 @@ output:
 
 
 ## Loading and preprocessing the data
+The zip of the data  is present on the root directory
+Unzip it and read the data
+``` {r Unzipandread, echo=TRUE}
+unzip("activity.zip")
+data<-read.csv("activity.csv")
+```
 
+Have a quick look at the data using summary
+```{r Summary, echo=TRUE}
+summary(data)
+```
 
+And the str
+```{r Str, echo=TRUE}
+str(data)
+```
+Looks good like : keep the data like that
 
 ## What is mean total number of steps taken per day?
 
+In this section we keept the missing values.
+Aggregate the the steps versus date and sum it to have a set of data with just the total number of steps
+```{r TotalStep, echo=TRUE}
+totalSteps<-aggregate(steps~date,data=data,sum,na.rm=TRUE)
+head(totalSteps,5)
+```
+
+Make an histogram of the total number of steps per day
+```{r Histo, echo=TRUE}
+hist(totalSteps$steps, xlab="Total Steps",  main =" Histogram of total number of steps per day")
+```
+
+Calculate the mean and the median value of the total number of steps.
+```{r MeanandMedian, echo=TRUE}
+mean(totalSteps$steps)
+median(totalSteps$steps)
+```
 
 
 ## What is the average daily activity pattern?
+Caculate the mean steps of daily activity
+```{r CalAveActivity, echo=TRUE}
+AverageActivity<-aggregate(steps~interval,data=data,mean,na.rm=TRUE)
+head(AverageActivity,5)
+```
 
+Plot the pattern found
+```{r PlotAv, echo=TRUE}
+plot(steps~interval,data=AverageActivity,type="l",main="Average Activity Pattern",xlab="activity by 5mn",ylab="Average steps")
+```
 
+Retrieve the interval which contain the max of mean step.
+```{r MaxInterval, echo=TRUE}
+Interval_MaxMeanSteps = AverageActivity[which.max(AverageActivity[, 2]), 1]
+Interval_MaxMeanSteps
+```
 
 ## Imputing missing values
 
+there are a number of days/intervals where there are missing values (coded as 𝙽�A).
 
+The presence of missing days may introduce bias into some calculations or summaries of the data.
+
+calculate the number of rows with NA
+```{r calculNATot, echo=TRUE}
+sum(is.na(data$steps))
+```
+strategy to fill in NA value: 
+
+create a new data set (data2) set with the NA replace by mean of t 5 mn (already computed in the previous question)
+```{r Strategy, echo=TRUE}
+Newdata = data
+for (i in 1:nrow(Newdata)) {
+  if (is.na(Newdata$steps[i])) {
+    for (j in 1:nrow(AverageActivity)) {
+      if (Newdata$interval[i] == AverageActivity[j, 1]) {
+        Newdata$steps[i] = AverageActivity[j, 2]
+      }
+    } 
+  }    
+}
+```
+Verify the set is not conatining NA now
+```{r verification new set, echo=TRUE}
+sum(is.na(Newdata$steps))
+head(Newdata,5)
+```
+
+Recalculate the total steps by day, plot histogram, calculate mean and median
+```{r PlotasFirst, echo=TRUE}
+
+NewtotalSteps<-aggregate(steps~date,data=Newdata,sum,na.rm=TRUE)
+
+hist(NewtotalSteps$steps, xlab="Total Steps",  main =" Histogram of total number of steps per day")
+
+mean(NewtotalSteps$steps)
+median(NewtotalSteps$steps)
+```
+We obtained an histogram nearly smilar to the previous ( some value change but not the form of it)
+
+we obtained the same mean as previous but the median value is now egal to the mean. This impact is  due by the replacement of the 2304 missing value by the 5-min interval obtained from the original dataset.
 
 ## Are there differences in activity patterns between weekdays and weekends?
+
+fisrt we have to add a new column in the previous dataset (name day).
+
+(local set to have english name of day to be reproduced by anyone.
+```{r Newcolumn, echo=TRUE}
+Sys.setlocale("LC_TIME", "C")
+#Sys.setenv(LANG="en")
+Newdata$day_of_week <- weekdays(as.Date(Newdata$date), abbreviate = TRUE)
+head(Newdata) 
+```
+
+Assiociate day with day type (weekday or weekend) and add it to the dataset
+```{r fillit, echo=TRUE}
+days <- c("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
+day_types <- c(rep("weekday", 5), rep("weekend", 2))
+days_of_week <- data.frame(days, day_types, stringsAsFactors = FALSE)
+colnames(days_of_week) <- c("day_of_week", "day_type")
+Newdata <- merge(Newdata, days_of_week, by = "day_of_week")
+Newdata$day_type <- as.factor(Newdata$day_type)
+head(Newdata)
+```
+
+use lattice for a similar look as the example
+
+recalculate the daily activity pattern 
+
+Check the average data frame
+
+plot the two figure for weekdays and weekend
+```{r  2plots, echo=TRUE}
+library(lattice)
+
+AverageActivity2=aggregate(steps~interval+day_type,Newdata,mean)
+head(AverageActivity2,3)
+xyplot(steps~interval|factor(day_types),data=AverageActivity,aspect=1/2,type="l",main="Average Activity Pattern",xlab="activity by 5mn",ylab="Average steps")
+```
